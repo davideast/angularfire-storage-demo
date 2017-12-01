@@ -1,31 +1,80 @@
 import { Component } from '@angular/core';
+import { AngularFireStorage } from 'angularfire2/storage';
+import { Observable } from 'rxjs/Observable';
+import { fromEvent } from 'rxjs/observable/fromEvent';
+import { map, filter, tap } from 'rxjs/operators';
+import { storage } from 'firebase/app';
 
 @Component({
   selector: 'app-root',
   template: `
-    <!--The content below is only a placeholder and can be replaced.-->
-    <div style="text-align:center">
-      <h1>
-        Welcome to {{title}}!
+  <div id="hero" class="let-hero">
+    <div class="let-container let-container-centerall">
+      <h1 class="let-title">
+        Cloud Storage for Firebase
       </h1>
-      <img width="300" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTAgMjUwIj4KICAgIDxwYXRoIGZpbGw9IiNERDAwMzEiIGQ9Ik0xMjUgMzBMMzEuOSA2My4ybDE0LjIgMTIzLjFMMTI1IDIzMGw3OC45LTQzLjcgMTQuMi0xMjMuMXoiIC8+CiAgICA8cGF0aCBmaWxsPSIjQzMwMDJGIiBkPSJNMTI1IDMwdjIyLjItLjFWMjMwbDc4LjktNDMuNyAxNC4yLTEyMy4xTDEyNSAzMHoiIC8+CiAgICA8cGF0aCAgZmlsbD0iI0ZGRkZGRiIgZD0iTTEyNSA1Mi4xTDY2LjggMTgyLjZoMjEuN2wxMS43LTI5LjJoNDkuNGwxMS43IDI5LjJIMTgzTDEyNSA1Mi4xem0xNyA4My4zaC0zNGwxNy00MC45IDE3IDQwLjl6IiAvPgogIDwvc3ZnPg==">
+      <h2 class="let-titlesmall">
+        comes to AngularFire!
+      </h2>
     </div>
-    <h2>Here are some links to help you start: </h2>
-    <ul>
-      <li>
-        <h2><a target="_blank" rel="noopener" href="https://angular.io/tutorial">Tour of Heroes</a></h2>
-      </li>
-      <li>
-        <h2><a target="_blank" rel="noopener" href="https://github.com/angular/angular-cli/wiki">CLI Documentation</a></h2>
-      </li>
-      <li>
-        <h2><a target="_blank" rel="noopener" href="https://blog.angular.io/">Angular blog</a></h2>
-      </li>
-    </ul>
-    
+  </div>
+
+  <div class="let-container let-container-main">
+    <h2>
+      Upload a file!
+    </h2>
+
+    <div class="uploadForm">
+      <label for="file">File:</label>
+      <input #file name="file" type="file" (change)="previewFile($event)" />
+      <button (click)="uploadFile($event)">Upload</button>
+
+      <app-progress-bar 
+        [percentage]="uploadPercent | async">
+      </app-progress-bar>
+
+      <a [href]="uploadURL | async">{{uploadURL | async}}</a>
+
+      <div class="preview">
+        <img [src]="previewURL | async" />
+      </div>
+
+    </div>
+
+  </div>
   `,
-  styles: []
+  styleUrls: ['./app.module.css'],
 })
 export class AppComponent {
   title = 'app';
+  previewURL: Observable<any>;
+  file: Blob;
+  uploadPercent: Observable<number>;
+  uploadURL: Observable<string>
+  constructor(private storage: AngularFireStorage) {}
+
+  previewFile(event) {
+    const reader = new FileReader();
+    this.file = event.target.files[0];
+    this.previewURL = fromEvent(reader, 'load').pipe(map(e => reader.result))
+    reader.readAsDataURL(this.file);
+  }
+
+  uploadFile() {
+    const randomId = Math.random().toString(36).substring(7);
+    const task = this.storage.upload(randomId, this.file);
+
+    this.uploadPercent = task.snapshotChanges()
+      .pipe(
+        map(s => s.bytesTransferred / s.totalBytes * 100)
+      );
+
+    this.uploadURL = task.snapshotChanges()
+      .pipe(
+        filter(s => s.bytesTransferred === s.totalBytes),
+        map(s => s.downloadURL),
+        tap(console.log),
+      )
+    
+  }
 }
